@@ -1,6 +1,7 @@
 package org.url.shortener.repository;
 
 import java.util.List;
+import java.util.Optional;
 import org.url.shortener.model.LongUrl;
 
 public interface URLRepository {
@@ -8,5 +9,6 @@ public interface URLRepository {
   String get(String shortUrlIdentifier);
   boolean exists(String shortUrlIdentifier);
   void remove(String shortUrlIdentifier);
-  List<String> getAll(long timeStamp);
+  List<String> getAllExpired(long timeStamp);
+  Optional<String> findByLongUrl(String longUrl);
 }

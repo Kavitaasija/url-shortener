@@ -1,9 +1,10 @@
 package org.url.shortener.repository;
 
-import java.util.Collection;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -13,56 +14,77 @@ import org.url.shortener.model.LongUrl;
 
 public class DefaultRepository implements URLRepository {
 
-  final Map<String, LongUrl> urls;
-  final TreeMap<Long, Set<String>> urlMap;
+  private final Map<String, LongUrl> shortToLongMap;
+  private final Map<String, String> longToShortMap;
+  private final TreeMap<Long, Set<String>> expiryMap;
 
   public DefaultRepository() {
-    urls = new ConcurrentHashMap<>();
-    urlMap = new TreeMap<>();
+    this.shortToLongMap = new ConcurrentHashMap<>();
+    this.longToShortMap = new ConcurrentHashMap<>();
+    this.expiryMap = new TreeMap<>();
   }
 
   @Override
   public void save(String shortUrlIdentifier, LongUrl longURL) {
-    synchronized (urlMap) {
-      if (urls.containsKey(shortUrlIdentifier)) {
-        throw new DuplicateUrlIdentifierException("URL identifier already exists: " + shortUrlIdentifier);
+    synchronized (expiryMap) {
+      if (shortToLongMap.containsKey(shortUrlIdentifier)) {
+        throw new DuplicateUrlIdentifierException(
+            "URL identifier already exists: " + shortUrlIdentifier);
       }
-      urls.put(shortUrlIdentifier, longURL);
-      Set<String> list = urlMap.getOrDefault(longURL.getExpiry(), new HashSet<>());
-      list.add(shortUrlIdentifier);
-      urlMap.put(longURL.getExpiry(), list);
+      shortToLongMap.put(shortUrlIdentifier, longURL);
+      longToShortMap.put(longURL.getUrl(), shortUrlIdentifier);
+      
+      Set<String> urlsAtExpiry = expiryMap.getOrDefault(longURL.getExpiry(), new HashSet<>());
+      urlsAtExpiry.add(shortUrlIdentifier);
+      expiryMap.put(longURL.getExpiry(), urlsAtExpiry);
     }
   }
 
   @Override
   public String get(String shortUrlIdentifier) {
-    return urls.get(shortUrlIdentifier).getUrl();
+    LongUrl longUrl = shortToLongMap.get(shortUrlIdentifier);
+    return longUrl != null ? longUrl.getUrl() : null;
   }
 
   @Override
   public boolean exists(String shortUrlIdentifier) {
-    return urls.containsKey(shortUrlIdentifier);
+    return shortToLongMap.containsKey(shortUrlIdentifier);
   }
 
   @Override
   public void remove(String shortUrlIdentifier) {
-    if (exists(shortUrlIdentifier)) {
-      LongUrl removedUrl = urls.remove(shortUrlIdentifier);
-      if (urlMap.containsKey(removedUrl.getExpiry())) {
-        urlMap.get(removedUrl.getExpiry()).remove(shortUrlIdentifier);
-        if (urlMap.get(removedUrl.getExpiry()).isEmpty()) {
-          urlMap.remove(removedUrl.getExpiry());
+    synchronized (expiryMap) {
+      if (!exists(shortUrlIdentifier)) {
+        return;
+      }
+      LongUrl removedUrl = shortToLongMap.remove(shortUrlIdentifier);
+      longToShortMap.remove(removedUrl.getUrl());
+      
+      Set<String> urlsAtExpiry = expiryMap.get(removedUrl.getExpiry());
+      if (urlsAtExpiry != null) {
+        urlsAtExpiry.remove(shortUrlIdentifier);
+        if (urlsAtExpiry.isEmpty()) {
+          expiryMap.remove(removedUrl.getExpiry());
         }
       }
     }
   }
 
   @Override
-  public List<String> getAll(long timeStamp) {
-    SortedMap<Long, Set<String>> sortedMap = urlMap.headMap(timeStamp);
-    if (sortedMap.isEmpty()) {
-      return List.of();
+  public List<String> getAllExpired(long timeStamp) {
+    synchronized (expiryMap) {
+      List<String> expiredUrls = new ArrayList<>();
+      SortedMap<Long, Set<String>> expiredEntries = expiryMap.headMap(timeStamp, true);
+      for (Set<String> urls : expiredEntries.values()) {
+        expiredUrls.addAll(urls);
+      }
+      return expiredUrls;
     }
-    return sortedMap.values().stream().flatMap(Collection::stream).toList();
   }
+  
+  @Override
+  public Optional<String> findByLongUrl(String longUrl) {
+    return Optional.ofNullable(longToShortMap.get(longUrl));
+  }
+
 }
