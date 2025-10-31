@@ -9,9 +9,11 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.stereotype.Repository;
 import org.url.shortener.exception.DuplicateUrlIdentifierException;
 import org.url.shortener.model.LongUrl;
 
+@Repository
 public class DefaultRepository implements URLRepository {
 
   private final Map<String, LongUrl> shortToLongMap;

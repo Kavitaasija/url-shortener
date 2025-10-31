@@ -1,6 +1,8 @@
 package org.url.shortener.service;
 
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 import org.url.shortener.config.URLShortenerConfig;
 import org.url.shortener.exception.DuplicateUrlIdentifierException;
 import org.url.shortener.exception.MaxAttemptReachedException;
@@ -8,39 +10,39 @@ import org.url.shortener.exception.NotFoundException;
 import org.url.shortener.model.LongUrl;
 import org.url.shortener.observer.URLEventPublisher;
 import org.url.shortener.repository.URLRepository;
-import org.url.shortener.strategy.URLGenerationStrategy;
+import org.url.shortener.strategy.StrategyFactory;
 import org.url.shortener.validator.AdditionalValidator;
 import org.url.shortener.validator.FormatValidator;
 import org.url.shortener.validator.LengthValidator;
 import org.url.shortener.validator.NullCheckValidator;
 import org.url.shortener.validator.URLValidator;
 
+@Service
 public class BasicURLService implements URLService {
 
   private final URLRepository urlRepository;
-  private final URLGenerationStrategy uniqueKeyGenerator;
+  private final StrategyFactory strategyFactory;
   private final CalculateUrlExpiry calculateUrlExpiry;
   private final URLValidator urlValidator;
   private final URLShortenerConfig config;
   private final URLEventPublisher eventPublisher;
 
 
+  @Autowired
   public BasicURLService(URLRepository urlRepository,
-                    URLGenerationStrategy uniqueKeyGenerator,
-                    URLEventPublisher eventPublisher) {
-    this(urlRepository, uniqueKeyGenerator, new URLShortenerConfig(), eventPublisher);
+                         StrategyFactory strategyFactory,
+                         URLEventPublisher eventPublisher) {
+    this(urlRepository, strategyFactory, new URLShortenerConfig(), eventPublisher);
   }
 
   public BasicURLService(URLRepository urlRepository,
-                    URLGenerationStrategy uniqueKeyGenerator,
-                    URLShortenerConfig config,
-                    URLEventPublisher eventPublisher) {
+                         StrategyFactory strategyFactory,
+                         URLShortenerConfig config,
+                         URLEventPublisher eventPublisher) {
     if (urlRepository == null) {
       throw new IllegalArgumentException("URLRepository cannot be null");
     }
-    if (uniqueKeyGenerator == null) {
-      throw new IllegalArgumentException("UniqueKeyGenerator cannot be null");
-    }
+
     if (config == null) {
       throw new IllegalArgumentException("URLShortenerConfig cannot be null");
     }
@@ -48,7 +50,7 @@ public class BasicURLService implements URLService {
       throw new IllegalArgumentException("URLEventPublisher cannot be null");
     }
     this.urlRepository = urlRepository;
-    this.uniqueKeyGenerator = uniqueKeyGenerator;
+    this.strategyFactory = strategyFactory;
     this.config = config;
     this.eventPublisher = eventPublisher;
     this.calculateUrlExpiry = new CalculateUrlExpiry(config.getDefaultUrlExpirySeconds());
@@ -80,7 +82,7 @@ public class BasicURLService implements URLService {
           "Unable to generate unique identifier after " + attemptCount + " attempts. Please try again.");
     }
 
-    String shortIdentifier = uniqueKeyGenerator.generateUniqueKey(longUrl, config.getShortUrlLength());
+    String shortIdentifier = strategyFactory.getDefaultStrategy().generateUniqueKey(longUrl, config.getShortUrlLength());
 
     try {
       Long expiryTime = calculateUrlExpiry.getDefaultExpiry();
