@@ -6,6 +6,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.url.shortener.observer.URLEventPublisher;
 import org.url.shortener.repository.URLRepository;
 
 public class DeleteExpiryUrlsScheduler {
@@ -14,17 +15,24 @@ public class DeleteExpiryUrlsScheduler {
   private final SchedulerConfig schedulerConfig;
   private ScheduledExecutorService scheduledExecutorService;
   private final AtomicBoolean isRunning;
+  private final URLEventPublisher eventPublisher;
 
-  public DeleteExpiryUrlsScheduler(URLRepository urlRepository, SchedulerConfig schedulerConfig) {
+  public DeleteExpiryUrlsScheduler(URLRepository urlRepository, 
+                                   SchedulerConfig schedulerConfig,
+                                   URLEventPublisher eventPublisher) {
     if (urlRepository == null) {
       throw new IllegalArgumentException("URLRepository cannot be null");
     }
     if (schedulerConfig == null) {
       throw new IllegalArgumentException("SchedulerConfig cannot be null");
     }
+    if (eventPublisher == null) {
+      throw new IllegalArgumentException("URLEventPublisher cannot be null");
+    }
     this.urlRepository = urlRepository;
     this.schedulerConfig = schedulerConfig;
     this.isRunning = new AtomicBoolean(false);
+    this.eventPublisher = eventPublisher;
   }
 
   public void start() {
@@ -75,7 +83,11 @@ public class DeleteExpiryUrlsScheduler {
       List<String> expiredUrls = urlRepository.getAllExpired(currentTime);
       
       if (!expiredUrls.isEmpty()) {
-        expiredUrls.forEach(urlRepository::remove);
+        for (String shortUrl : expiredUrls) {
+          urlRepository.remove(shortUrl);
+          // Publish expiration event asynchronously
+          eventPublisher.publishUrlExpired(shortUrl);
+        }
       }
     } catch (Exception e) {
       System.err.println("Error during URL cleanup: " + e.getMessage());

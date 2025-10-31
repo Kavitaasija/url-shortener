@@ -5,22 +5,22 @@ package org.url.shortener.config;
  * All configuration values are centralized here for easy modification.
  */
 public class URLShortenerConfig {
-  
+
   // URL Generation Settings
   private final int shortUrlLength;
   private final int maxCollisionRetryAttempts;
-  
+
   // Expiry Settings (in seconds)
   private final long defaultUrlExpirySeconds;
-  
+
   // Scheduler Settings
   private final int cleanupFrequencySeconds;
   private final int schedulerThreadPoolSize;
-  
+
   // Validation Settings
   private final boolean enableUrlValidation;
   private final boolean preventDuplicateLongUrls;
-  
+
   /**
    * Creates a configuration with default values.
    */
@@ -33,7 +33,7 @@ public class URLShortenerConfig {
     this.enableUrlValidation = true;
     this.preventDuplicateLongUrls = true;
   }
-  
+
   /**
    * Creates a custom configuration.
    */
@@ -49,33 +49,76 @@ public class URLShortenerConfig {
     this.enableUrlValidation = enableUrlValidation;
     this.preventDuplicateLongUrls = preventDuplicateLongUrls;
   }
-  
+
   public int getShortUrlLength() {
     return shortUrlLength;
   }
-  
+
   public int getMaxCollisionRetryAttempts() {
     return maxCollisionRetryAttempts;
   }
-  
+
   public long getDefaultUrlExpirySeconds() {
     return defaultUrlExpirySeconds;
   }
-  
+
   public int getCleanupFrequencySeconds() {
     return cleanupFrequencySeconds;
   }
-  
+
   public int getSchedulerThreadPoolSize() {
     return schedulerThreadPoolSize;
   }
-  
+
   public boolean isUrlValidationEnabled() {
     return enableUrlValidation;
   }
-  
+
   public boolean isDuplicateLongUrlsPrevented() {
     return preventDuplicateLongUrls;
+  }
+
+  public static class Builder {
+    private int shortUrlLength = 6;
+    private int maxCollisionRetryAttempts = 5;
+    private long defaultUrlExpirySeconds = 3600;
+    private int cleanupFrequencySeconds = 60;
+    private int schedulerThreadPoolSize = 2;
+    private boolean enableUrlValidation = true;
+    private boolean preventDuplicateLongUrls = true;
+
+    public Builder withShortUrlLength(int length) {
+      this.shortUrlLength = length;
+      return this;
+    }
+
+    public Builder withMaxRetryAttempts(int attempts) {
+      this.maxCollisionRetryAttempts = attempts;
+      return this;
+    }
+
+    public Builder withDefaultExpiry(long seconds) {
+      this.defaultUrlExpirySeconds = seconds;
+      return this;
+    }
+
+    public Builder disableValidation() {
+      this.enableUrlValidation = false;
+      return this;
+    }
+
+    public URLShortenerConfig build() {
+      return new URLShortenerConfig(
+          shortUrlLength, maxCollisionRetryAttempts,
+          defaultUrlExpirySeconds, cleanupFrequencySeconds,
+          schedulerThreadPoolSize, enableUrlValidation,
+          preventDuplicateLongUrls
+      );
+    }
+  }
+
+  public static Builder builder() {
+    return new Builder();
   }
 }
 

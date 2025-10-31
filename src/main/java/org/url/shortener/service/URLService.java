@@ -6,26 +6,31 @@ import org.url.shortener.exception.DuplicateUrlIdentifierException;
 import org.url.shortener.exception.MaxAttemptReachedException;
 import org.url.shortener.exception.NotFoundException;
 import org.url.shortener.model.LongUrl;
+import org.url.shortener.observer.URLEventPublisher;
 import org.url.shortener.repository.URLRepository;
+import org.url.shortener.strategy.URLGenerationStrategy;
 
 
 public class URLService {
 
   private final URLRepository urlRepository;
-  private final UniqueKeyGenerator uniqueKeyGenerator;
+  private final URLGenerationStrategy uniqueKeyGenerator;
   private final CalculateUrlExpiry calculateUrlExpiry;
   private final URLValidator urlValidator;
   private final URLShortenerConfig config;
+  private final URLEventPublisher eventPublisher;
 
 
   public URLService(URLRepository urlRepository,
-                    UniqueKeyGenerator uniqueKeyGenerator) {
-    this(urlRepository, uniqueKeyGenerator, new URLShortenerConfig());
+                    URLGenerationStrategy uniqueKeyGenerator,
+                    URLEventPublisher eventPublisher) {
+    this(urlRepository, uniqueKeyGenerator, new URLShortenerConfig(), eventPublisher);
   }
 
   public URLService(URLRepository urlRepository,
-                    UniqueKeyGenerator uniqueKeyGenerator,
-                    URLShortenerConfig config) {
+                    URLGenerationStrategy uniqueKeyGenerator,
+                    URLShortenerConfig config,
+                    URLEventPublisher eventPublisher) {
     if (urlRepository == null) {
       throw new IllegalArgumentException("URLRepository cannot be null");
     }
@@ -35,10 +40,13 @@ public class URLService {
     if (config == null) {
       throw new IllegalArgumentException("URLShortenerConfig cannot be null");
     }
-    
+    if (eventPublisher == null) {
+      throw new IllegalArgumentException("URLEventPublisher cannot be null");
+    }
     this.urlRepository = urlRepository;
     this.uniqueKeyGenerator = uniqueKeyGenerator;
     this.config = config;
+    this.eventPublisher = eventPublisher;
     this.calculateUrlExpiry = new CalculateUrlExpiry(config.getDefaultUrlExpirySeconds());
     this.urlValidator = new URLValidator();
   }
@@ -47,7 +55,6 @@ public class URLService {
     if (config.isUrlValidationEnabled()) {
       urlValidator.validate(longUrl);
     }
-    
     if (config.isDuplicateLongUrlsPrevented()) {
       Optional<String> existingShortUrl = urlRepository.findByLongUrl(longUrl);
       if (existingShortUrl.isPresent()) {
@@ -55,7 +62,6 @@ public class URLService {
         return existingShortUrl.get();
       }
     }
-    
     return createShortUrl(longUrl, 0);
   }
 
@@ -64,16 +70,18 @@ public class URLService {
       throw new MaxAttemptReachedException(
           "Unable to generate unique identifier after " + attemptCount + " attempts. Please try again.");
     }
-    
-    String shortIdentifier = uniqueKeyGenerator.generateUniqueKey(config.getShortUrlLength());
-    
+
+    String shortIdentifier = uniqueKeyGenerator.generateUniqueKey(longUrl, config.getShortUrlLength());
+
     try {
       Long expiryTime = calculateUrlExpiry.getDefaultExpiry();
       urlRepository.save(shortIdentifier, new LongUrl(longUrl, expiryTime));
       System.out.println("Created short URL: " + shortIdentifier + " for: " + longUrl);
+      eventPublisher.publishUrlCreated(shortIdentifier, longUrl, expiryTime);
       return shortIdentifier;
     } catch (DuplicateUrlIdentifierException e) {
       System.out.println("Collision detected for: " + shortIdentifier + ", retrying...");
+      eventPublisher.publishCollisionDetected(shortIdentifier, attemptCount + 1);
       return createShortUrl(longUrl, attemptCount + 1);
     }
   }
@@ -82,11 +90,11 @@ public class URLService {
     if (shortUrlIdentifier == null || shortUrlIdentifier.trim().isEmpty()) {
       throw new IllegalArgumentException("Short URL identifier cannot be null or empty");
     }
-    
     String longUrl = urlRepository.get(shortUrlIdentifier);
     if (longUrl == null) {
       throw new NotFoundException(shortUrlIdentifier);
     }
+    eventPublisher.publishUrlAccessed(shortUrlIdentifier, longUrl);
     return longUrl;
   }
 
@@ -94,6 +102,7 @@ public class URLService {
     if (urlRepository.exists(shortUrlIdentifier)) {
       urlRepository.remove(shortUrlIdentifier);
       System.out.println("Deleted short URL: " + shortUrlIdentifier);
+      eventPublisher.publishUrlDeleted(shortUrlIdentifier);
       return true;
     }
     return false;
