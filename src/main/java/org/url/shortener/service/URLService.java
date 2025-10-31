@@ -1,57 +1,102 @@
 package org.url.shortener.service;
 
+import java.util.Optional;
+import org.url.shortener.config.URLShortenerConfig;
 import org.url.shortener.exception.DuplicateUrlIdentifierException;
 import org.url.shortener.exception.MaxAttemptReachedException;
 import org.url.shortener.exception.NotFoundException;
 import org.url.shortener.model.LongUrl;
 import org.url.shortener.repository.URLRepository;
-import org.url.shortener.scheduler.DeleteExpiryUrlsScheduler;
-import org.url.shortener.scheduler.SchedulerConfig;
+
 
 public class URLService {
 
-  public static final int FREQUENCY = 5;
-  public static final double MAX_ATTEMPT = 5;
-  URLRepository urlRepository;
-  UniqueKeyGenerator uniqueKeyGenerator;
-  CalculateUrlExpiry calculateUrlExpiry;
-  DeleteExpiryUrlsScheduler deleteExpiryUrlsScheduler;
+  private final URLRepository urlRepository;
+  private final UniqueKeyGenerator uniqueKeyGenerator;
+  private final CalculateUrlExpiry calculateUrlExpiry;
+  private final URLValidator urlValidator;
+  private final URLShortenerConfig config;
 
-  private final static int URL_LENGTH = 6;
 
   public URLService(URLRepository urlRepository,
                     UniqueKeyGenerator uniqueKeyGenerator) {
+    this(urlRepository, uniqueKeyGenerator, new URLShortenerConfig());
+  }
+
+  public URLService(URLRepository urlRepository,
+                    UniqueKeyGenerator uniqueKeyGenerator,
+                    URLShortenerConfig config) {
+    if (urlRepository == null) {
+      throw new IllegalArgumentException("URLRepository cannot be null");
+    }
+    if (uniqueKeyGenerator == null) {
+      throw new IllegalArgumentException("UniqueKeyGenerator cannot be null");
+    }
+    if (config == null) {
+      throw new IllegalArgumentException("URLShortenerConfig cannot be null");
+    }
+    
     this.urlRepository = urlRepository;
     this.uniqueKeyGenerator = uniqueKeyGenerator;
-    this.calculateUrlExpiry = new CalculateUrlExpiry();
-    this.deleteExpiryUrlsScheduler = new DeleteExpiryUrlsScheduler(this.urlRepository, new SchedulerConfig(FREQUENCY));
-    deleteExpiryUrlsScheduler.scheduleExpiredUrlsDelete();
+    this.config = config;
+    this.calculateUrlExpiry = new CalculateUrlExpiry(config.getDefaultUrlExpirySeconds());
+    this.urlValidator = new URLValidator();
   }
 
-  public String save(String url) {
-    return save(url, 0);
-  }
-
-  private String save(String url, int attemptCount) {
-    if (attemptCount <= MAX_ATTEMPT) {
-      String generateUniqueIdentifier = uniqueKeyGenerator.generateUniqueKey(URL_LENGTH);
-      try {
-        urlRepository.save(generateUniqueIdentifier, new LongUrl(url, calculateUrlExpiry.getDefaultExpiry()));
-        return generateUniqueIdentifier;
-      } catch (DuplicateUrlIdentifierException e) {
-        return save(url, attemptCount + 1);
+  public String shortenUrl(String longUrl) {
+    if (config.isUrlValidationEnabled()) {
+      urlValidator.validate(longUrl);
+    }
+    
+    if (config.isDuplicateLongUrlsPrevented()) {
+      Optional<String> existingShortUrl = urlRepository.findByLongUrl(longUrl);
+      if (existingShortUrl.isPresent()) {
+        System.out.println("Returning existing short URL for: " + longUrl);
+        return existingShortUrl.get();
       }
     }
-    throw new MaxAttemptReachedException("Unable to generate unique identifier try again in some time");
+    
+    return createShortUrl(longUrl, 0);
   }
 
-  public String get(String urlIdentifier) {
-    String url = urlRepository.get(urlIdentifier);
-    if (url == null) {
-      throw new NotFoundException(urlIdentifier);
+  private String createShortUrl(String longUrl, int attemptCount) {
+    if (attemptCount > config.getMaxCollisionRetryAttempts()) {
+      throw new MaxAttemptReachedException(
+          "Unable to generate unique identifier after " + attemptCount + " attempts. Please try again.");
     }
-    return url;
+    
+    String shortIdentifier = uniqueKeyGenerator.generateUniqueKey(config.getShortUrlLength());
+    
+    try {
+      Long expiryTime = calculateUrlExpiry.getDefaultExpiry();
+      urlRepository.save(shortIdentifier, new LongUrl(longUrl, expiryTime));
+      System.out.println("Created short URL: " + shortIdentifier + " for: " + longUrl);
+      return shortIdentifier;
+    } catch (DuplicateUrlIdentifierException e) {
+      System.out.println("Collision detected for: " + shortIdentifier + ", retrying...");
+      return createShortUrl(longUrl, attemptCount + 1);
+    }
   }
-  // URL validator
-  // Add check for duplicate long url
+
+  public String getLongUrl(String shortUrlIdentifier) {
+    if (shortUrlIdentifier == null || shortUrlIdentifier.trim().isEmpty()) {
+      throw new IllegalArgumentException("Short URL identifier cannot be null or empty");
+    }
+    
+    String longUrl = urlRepository.get(shortUrlIdentifier);
+    if (longUrl == null) {
+      throw new NotFoundException(shortUrlIdentifier);
+    }
+    return longUrl;
+  }
+
+  public boolean deleteUrl(String shortUrlIdentifier) {
+    if (urlRepository.exists(shortUrlIdentifier)) {
+      urlRepository.remove(shortUrlIdentifier);
+      System.out.println("Deleted short URL: " + shortUrlIdentifier);
+      return true;
+    }
+    return false;
+  }
+
 }
