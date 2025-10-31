@@ -1,0 +1,15 @@
+apiVersion: v2
+name: url-shortener
+description: A Helm chart for URL Shortener application
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - url-shortener
+  - java
+  - spring-boot
+home: https://github.com/Kavitaasija/url-shortener
+maintainers:
+  - name: Kavita
+    email: kavitaaasija@gmail.com
+

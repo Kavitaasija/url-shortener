@@ -1,0 +1,87 @@
+# Production environment values
+replicaCount: 3
+
+image:
+  repository: your-registry.io/url-shortener
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 1Gi
+  requests:
+    cpu: 1000m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: url-shortener.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: url-shortener-prod-tls
+      hosts:
+        - url-shortener.example.com
+
+application:
+  config:
+    server:
+      port: 8080
+    spring:
+      application:
+        name: url-shortener
+    logging:
+      level:
+        org:
+          url:
+            shortener: INFO
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+  allowPrivilegeEscalation: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Production-specific node affinity
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - url-shortener
+          topologyKey: kubernetes.io/hostname
+

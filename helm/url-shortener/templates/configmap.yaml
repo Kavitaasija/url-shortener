@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "url-shortener.fullname" . }}-config
+  labels:
+    {{- include "url-shortener.labels" . | nindent 4 }}
+data:
+  application.properties: |
+    server.port={{ .Values.application.config.server.port }}
+    spring.application.name={{ .Values.application.config.spring.application.name }}
+
+    # Logging Configuration
+    logging.level.org.url.shortener={{ .Values.application.config.logging.level.org.url.shortener }}
+    logging.pattern.console=%d{yyyy-MM-dd HH:mm:ss} - %msg%n
+

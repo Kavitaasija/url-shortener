@@ -1,0 +1,51 @@
+# Staging environment values
+replicaCount: 2
+
+image:
+  repository: your-registry.io/url-shortener
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+  requests:
+    cpu: 500m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+  hosts:
+    - host: url-shortener-staging.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: url-shortener-staging-tls
+      hosts:
+        - url-shortener-staging.example.com
+
+application:
+  config:
+    server:
+      port: 8080
+    spring:
+      application:
+        name: url-shortener-staging
+    logging:
+      level:
+        org:
+          url:
+            shortener: INFO
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
