@@ -51,7 +51,7 @@ spec:
           readOnly: true
         livenessProbe:
           httpGet:
-            path: /api/urls
+            path: /api/
             port: http
           initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
           periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
@@ -60,7 +60,7 @@ spec:
           failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
         readinessProbe:
           httpGet:
-            path: /api/urls
+            path: /api/
             port: http
           initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
           periodSeconds: {{ .Values.readinessProbe.periodSeconds }}

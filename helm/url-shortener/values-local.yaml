@@ -1,0 +1,95 @@
+# Local development values - no cloud dependencies
+replicaCount: 1
+
+image:
+  repository: url-shortener
+  pullPolicy: IfNotPresent  # Don't try to pull from registry
+  tag: "local"
+
+# No image pull secrets needed for local
+imagePullSecrets: []
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+  allowPrivilegeEscalation: false
+
+service:
+  type: NodePort  # Use NodePort for easy local access
+  port: 8080
+  targetPort: 8080
+  annotations: {}
+
+ingress:
+  enabled: false  # Disable ingress for local setup
+
+# Reduced resources for local development
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+# Disable autoscaling for local
+autoscaling:
+  enabled: false
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Application configuration
+application:
+  config:
+    server:
+      port: 8080
+    spring:
+      application:
+        name: url-shortener
+    logging:
+      level:
+        org:
+          url:
+            shortener: DEBUG  # More verbose logging for local development
+
+# Relaxed probes for local development
+livenessProbe:
+  httpGet:
+    path: /api/urls
+    port: 8080
+  initialDelaySeconds: 15
+  periodSeconds: 10
+  timeoutSeconds: 5
+  successThreshold: 1
+  failureThreshold: 5
+
+readinessProbe:
+  httpGet:
+    path: /api/urls
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  successThreshold: 1
+  failureThreshold: 3
+
+# Disable pod disruption budget for local
+podDisruptionBudget:
+  enabled: false
+
