@@ -9,7 +9,7 @@ import org.url.shortener.repository.DefaultRepository;
 import org.url.shortener.repository.URLRepository;
 import org.url.shortener.scheduler.DeleteExpiryUrlsScheduler;
 import org.url.shortener.scheduler.SchedulerConfig;
-import org.url.shortener.service.UniqueKeyGenerator;
+import org.url.shortener.strategy.UniqueKeyGenerator;
 import org.url.shortener.service.URLService;
 import org.url.shortener.strategy.RandomGenerationStrategy;
 

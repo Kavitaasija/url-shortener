@@ -1,7 +1,5 @@
 package org.url.shortener.strategy;
 
-import org.url.shortener.service.UniqueKeyGenerator;
-
 public class RandomGenerationStrategy implements URLGenerationStrategy {
     private final UniqueKeyGenerator uniqueKeyGenerator;
 

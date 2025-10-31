@@ -1,4 +1,4 @@
-package org.url.shortener.service;
+package org.url.shortener.strategy;
 
 import java.security.SecureRandom;
 
