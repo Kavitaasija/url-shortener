@@ -4,10 +4,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * Listener that collects analytics data about URL usage.
- * Tracks access patterns and popular URLs.
- */
 public class AnalyticsListener implements URLEventListener {
   
   private final Map<String, AtomicInteger> accessCounts = new ConcurrentHashMap<>();
@@ -61,18 +57,12 @@ public class AnalyticsListener implements URLEventListener {
   public void onCollisionDetected(String shortUrl, int attemptNumber) {
     // Analytics doesn't track collisions, but could be extended to do so
   }
-  
-  /**
-   * Removes tracking data for a URL.
-   */
+
   private void cleanupUrlData(String shortUrl) {
     accessCounts.remove(shortUrl);
     creationTimes.remove(shortUrl);
   }
-  
-  /**
-   * Gets the most accessed URLs.
-   */
+
   public void printTopUrls(int limit) {
     System.out.println("\n=== TOP " + limit + " MOST ACCESSED URLs ===");
     accessCounts.entrySet().stream()

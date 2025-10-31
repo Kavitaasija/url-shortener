@@ -8,6 +8,11 @@ import org.url.shortener.exception.NotFoundException;
 import org.url.shortener.model.LongUrl;
 import org.url.shortener.observer.URLEventPublisher;
 import org.url.shortener.repository.URLRepository;
+import org.url.shortener.validator.AdditionalValidator;
+import org.url.shortener.validator.FormatValidator;
+import org.url.shortener.validator.LengthValidator;
+import org.url.shortener.validator.NullCheckValidator;
+import org.url.shortener.validator.URLValidator;
 import org.url.shortener.strategy.URLGenerationStrategy;
 
 
@@ -48,7 +53,10 @@ public class URLService {
     this.config = config;
     this.eventPublisher = eventPublisher;
     this.calculateUrlExpiry = new CalculateUrlExpiry(config.getDefaultUrlExpirySeconds());
-    this.urlValidator = new URLValidator();
+    this.urlValidator = new NullCheckValidator();
+    this.urlValidator.setNext(new LengthValidator())
+        .setNext(new FormatValidator())
+        .setNext(new AdditionalValidator());
   }
 
   public String shortenUrl(String longUrl) {
